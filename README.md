@@ -2,7 +2,7 @@
 
 Simple web audio examples for the Paris.JS meetup presentation "Web Audio Jam".
 
-All graphs contain an analyser node before the context's destination that is used to display the time domain data in a canvas.
+Graphs 1-3 contain an analyser node before the context's destination that is used to display the time domain data in a canvas.
 
 ##Graph 1
 Contains a simple oscillator node connected to a gain node.
@@ -12,3 +12,6 @@ We get the input from the user media - usually the microphone, but also possibly
 
 ##Graph 3
 Loading and playing an external file with a buffer source node.
+
+## Graph 4
+Creates waveform on the fly.
