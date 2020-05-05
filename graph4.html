@@ -1,0 +1,139 @@
+<!doctype html>
+<html>
+<head><title>External file</title></head>
+<body style="text-align: center;">
+<label for="resolution">Resolution:</label><input type="number" id="resolution" value="100"><br/>
+<canvas id="audio-visualisation" width="850" height="350" style="margin-top: 20px;border-radius: 8px;"></canvas>
+<script>
+
+// Create audio context
+var context = new (window.AudioContext || window.webkitAudioContext)();
+
+// Create analyser node
+var analyser = context.createAnalyser();
+
+// Create request to fetch the audio file
+var request = new XMLHttpRequest();
+
+// Initialize GET request
+request.open('GET', './synth.m4a', true);
+
+// We specify that we expect a raw binary data buffer that will contain the audio
+request.responseType = 'arraybuffer';
+
+// Create buffer source node
+var source = context.createBufferSource();
+
+const canvas = document.getElementById('audio-visualisation');
+var canvasContext = canvas.getContext('2d');
+const resolutionInput = document.getElementById('resolution');
+var waveformData,cursorX=null;
+
+function sum(ab) { 
+	let s = 0;
+	for (let q = 0; q<ab.length;q++) {
+		s += ab[q];
+	}
+	return s;
+}
+
+resolutionInput.addEventListener("change", draw);
+//canvas.addEventListener("mousemove", function(e){cursorX=e.clientX - e.currentTarget.offsetLeft;return draw();});
+
+request.onload = function(e) {
+	
+	// Decode audio file data contained in the array buffer
+	context.decodeAudioData(e.target.response, function(buffer) {
+
+
+		// Set parameters of buffer node
+		source.loop = false;
+		source.buffer = buffer;
+
+		waveformData = source.buffer.getChannelData(0);
+
+		// Draw.
+		draw();
+	});
+};
+
+// Error management
+request.onreadystatechange = function(event) {
+	if (request.readyState === 4 && request.status !== 200)
+		console.error('Error while fetching audio. ' + request.statusText);
+};
+
+// Send request
+request.send();
+
+function draw() {
+	const t0 = performance.now();
+
+	const width = 850;
+	const height = 350;
+
+	let xs = [],
+	    ys = [];
+
+	// Range of samples to average, more = finer graph.
+	const resolution = parseInt(resolutionInput.value) ?? 50;
+	const range = source.buffer.sampleRate / resolution;
+	
+	canvasContext.fillStyle = 'rgb(200, 200, 200)';
+	canvasContext.fillRect(0, 0, width, height);
+	canvasContext.lineWidth = 1;
+	canvasContext.strokeStyle = 'rgb(0, 0, 0)';
+
+	const sliceWidth = width / (source.buffer.length / range);
+
+	let y = 0, x = 0;
+	let maxy = 0;
+
+	for (var a = 0; a < source.buffer.length; a += range, x += sliceWidth) {
+		let s = a;
+		let e = Math.min(a + range, source.buffer.length-1);
+		y = sum(waveformData.slice(s,e)) / range;
+		maxy = Math.max(Math.abs(y), maxy);
+		xs.push(x);
+		ys.push(y);
+	}
+
+	// End on mid line.
+	xs.push(x + sliceWidth);
+	ys.push(0);
+
+	// Scale.
+	for (let z = 0; z < ys.length; z++) {
+		scale = (height / 2) / maxy;
+		ys[z] *= scale;
+	}
+
+	// Draw.
+	canvasContext.beginPath();
+	canvasContext.moveTo(0, (height / 2));
+
+	for (var o=0;o<xs.length;++o) {
+		canvasContext.lineTo(xs[o], (height / 2) - ys[o]);
+	}
+
+	canvasContext.lineTo(xs[o], (height / 2));
+	canvasContext.moveTo(0, (height / 2));
+	canvasContext.fillStyle = 'green';
+	canvasContext.fill();
+	canvasContext.stroke();
+
+	// Location marker (uncomment event listener line above to enable).
+	if (cursorX > 0 && cursorX < width) {
+		canvasContext.moveTo(cursorX, 0);
+		canvasContext.lineTo(cursorX, (height));
+		canvasContext.stroke();
+	}
+
+	const t1 = performance.now();
+
+	console.log("Render took", t1-t0, "ms");
+};
+
+</script>
+</body>
+</html>
